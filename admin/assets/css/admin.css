@@ -1,0 +1,93 @@
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+
+body { background: #f1f5f9; color: #1e293b; }
+
+.app { display: flex; min-height: 100vh; }
+
+/* Sidebar Styling */
+.sidebar {
+    width: 260px;
+    background: #0f172a; /* Deep Navy */
+    color: white;
+    padding: 25px 15px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+
+.sidebar .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 40px;
+    padding-left: 10px;
+}
+
+.sidebar .logo i {
+    color: #4f46e5; /* Electric Indigo */
+}
+
+.menu-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #64748b;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+    padding-left: 12px;
+}
+
+.sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #94a3b8;
+    text-decoration: none;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-bottom: 5px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.sidebar a i {
+    width: 20px;
+    font-size: 16px;
+}
+
+/* Hover & Active States */
+.sidebar a:hover {
+    background: #1e293b;
+    color: #fff;
+}
+
+.sidebar a.active {
+    background: #4f46e5;
+    color: white;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.menu-divider {
+    height: 1px;
+    background: #1e293b;
+    margin: 20px 0;
+}
+
+.exit-link {
+    color: #f87171 !important; /* Soft Red */
+}
+
+.exit-link:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* Content Area Refinement */
+.content {
+    flex: 1;
+    padding: 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+}

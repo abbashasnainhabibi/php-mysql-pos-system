@@ -1,0 +1,122 @@
+/* POS Layout Enhancements */
+.pos-layout {
+    display: grid;
+    grid-template-columns: 65% 35%;
+    gap: 30px;
+    align-items: start;
+    margin-top: 20px;
+}
+
+.bill-panel {
+    position: sticky;
+    top: 20px;
+    height: fit-content;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    padding: 25px;
+}
+
+.total-box {
+    font-size: 20px;
+    text-align: right;
+    font-weight: bold;
+    color: #2563eb;
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.save-btn {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.save-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(22, 163, 74, 0.3);
+}
+
+.select-card {
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #fff;
+    font-weight: 500;
+    color: #374151;
+}
+
+.select-card:hover {
+    border-color: #d1d5db;
+    background: #f9fafb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.select-card.active {
+    border-color: #2563eb;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.2);
+    color: #1e40af;
+    font-weight: 600;
+}
+
+/* Grid Layout for Cards */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+/* Form Elements */
+input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 16px;
+    margin-top: 15px;
+    transition: border-color 0.3s ease;
+}
+
+input[type="number"]:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+
+button:disabled {
+    background: #d1d5db !important;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .pos-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 15px;
+    }
+    .select-card {
+        padding: 15px;
+    }
+}
