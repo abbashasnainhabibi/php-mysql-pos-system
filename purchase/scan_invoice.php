@@ -394,25 +394,30 @@ $supplier_name = $s['name'];
         }
     }
 
-    // Drag & drop
+    // Drag & drop logic
     const zone = document.getElementById('uploadZone');
-    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-    zone.addEventListener('drop', e => {
-        e.preventDefault();
-        zone.classList.remove('dragover');
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            document.getElementById('fileInput').files = e.dataTransfer.files;
-            fileSelected(document.getElementById('fileInput'));
-        }
-    });
+    if (zone) {
+        zone.addEventListener('dragover', e => { 
+            e.preventDefault(); 
+            zone.classList.add('dragover'); 
+        });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                document.getElementById('fileInput').files = e.dataTransfer.files;
+                fileSelected(document.getElementById('fileInput'));
+            }
+        });
+    }
 
-    function startScan() {
+ function startScan() {
         const file = document.getElementById('fileInput').files[0];
         if (!file) return;
 
-        // Show loading
+        // Hide upload panel, show loading animation
         document.getElementById('uploadCard').style.display = 'none';
         document.getElementById('loadingState').style.display = 'block';
 
@@ -434,13 +439,28 @@ $supplier_name = $s['name'];
                 return;
             }
 
-            renderResults(data.items);
+            // STRICT FILTER: Remove 'none' matches AND anything without a valid product ID
+            const matchedOnly = data.items.filter(item => {
+                return item.match_type !== 'none' && 
+                       item.product_id !== null && 
+                       item.product_id !== undefined && 
+                       item.product_id !== '';
+            });
+
+            if (matchedOnly.length === 0) {
+                alert('No products from this file match this supplier\'s catalog.');
+                document.getElementById('uploadCard').style.display = 'block';
+                return;
+            }
+
+            // Render only the strictly successful supplier matches
+            renderResults(matchedOnly);
             document.getElementById('resultsSection').style.display = 'block';
         })
         .catch(err => {
             document.getElementById('loadingState').style.display = 'none';
             document.getElementById('uploadCard').style.display = 'block';
-            alert('Something went wrong. Please try again.');
+            alert('Something went wrong. Please check your browser console.');
             console.error(err);
         });
     }
@@ -477,42 +497,62 @@ $supplier_name = $s['name'];
     }
 
     function removeRow(idx) {
-        document.getElementById('row_' + idx).remove();
+        const row = document.getElementById('row_' + idx);
+        if (row) row.remove();
     }
 
     function confirmItems() {
         const items = [];
+        
         for (let i = 0; i < window.totalItems; i++) {
             const row = document.getElementById('row_' + i);
-            if (!row) continue; // removed
-            const mtype = document.getElementById('mtype_' + i)?.value;
-            if (mtype === 'none') continue;
+            if (!row) continue; 
 
-            items.push({
-                product_id: document.getElementById('pid_' + i).value,
-                description: document.getElementById('desc_' + i).value,
-                quantity: parseInt(document.getElementById('qty_' + i).value),
-                unit_price: parseFloat(document.getElementById('price_' + i).value)
-            });
+            const matchType = document.getElementById('mtype_' + i).value;
+            if (matchType === 'none') continue; 
+
+            const productId = parseInt(document.getElementById('pid_' + i).value);
+            const description = document.getElementById('desc_' + i).value;
+            const quantity = parseInt(document.getElementById('qty_' + i).value);
+            const unitPrice = parseFloat(document.getElementById('price_' + i).value);
+
+            if (productId > 0 && quantity > 0) {
+                items.push({
+                    product_id: productId,
+                    description: description,
+                    quantity: quantity,
+                    unit_price: unitPrice
+                });
+            }
         }
 
         if (items.length === 0) {
-            alert('No valid items to add!');
+            alert('No valid matched products to add.');
             return;
         }
 
         fetch('apply_scan.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: items, supplier_id: supplierId })
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                supplier_id: supplierId,
+                items: items
+            })
         })
         .then(r => r.json())
-        .then(d => {
-            if (d.success) {
-                window.location = 'purchase_pos.php?supplier_id=' + supplierId;
-            } else {
-                alert('Error: ' + (d.error || 'Unknown error'));
+        .then(data => {
+            if (data.error) {
+                alert('Error adding items: ' + data.error);
+            } else if (data.success) {
+                alert(`Successfully added ${data.added} items!`);
+                window.location.href = 'purchase_pos.php?supplier_id=' + supplierId;
             }
+        })
+        .catch(err => {
+            alert('Server error processing request.');
+            console.error(err);
         });
     }
 </script>

@@ -6,6 +6,7 @@
  */
 
 session_start();
+require '../vendor/autoload.php';
 include("../config/db.php");
 
 header('Content-Type: application/json');
@@ -233,74 +234,105 @@ if (in_array($ext, ['txt', 'csv'])) {
     }
 
 // ============================================================
-// IMAGE / PDF: Needs Anthropic API key
+// IMAGE / PDF / FREE PARSER PROCESSING
 // ============================================================
 } else {
+// === PDF HANDLING (INTEGRATED FIX) ===
+if ($ext === 'pdf') {
+    try {
+        $parser = new \Smalot\PdfParser\Parser();
+        $pdf = $parser->parseFile($file['tmp_name']);
+        $text = $pdf->getText();
 
-    if ($USE_MOCK) {
-        // Mock for image/PDF - uses real supplier products
-        sleep(2);
+        // THE CRITICAL FIX: 
+        // This regex removes newlines found inside double quotes
+        // e.g., "master dabbi - Black\n" becomes "master dabbi - Black"
+        $text = preg_replace_callback('/"([^"]+)"/', function($matches) {
+            return '"' . str_replace(["\n", "\r"], "", $matches[1]) . '"';
+        }, $text);
+
+        $rawLines = explode("\n", $text);
         $extracted_items = [];
-        $mockProducts = array_slice($products, 0, 4);
-        foreach ($mockProducts as $p) {
-            $extracted_items[] = [
-                'text'     => $p['description'],
-                'quantity' => rand(2, 15), 'unit_price' => 0
+
+        foreach ($rawLines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+            
+            // Clean up standard PDF CSV debris
+            $line = str_replace(['"', 'Rs '], '', $line);
+            
+            // Standardize splitting
+            $parts = array_map('trim', explode(',', $line));
+            
+            // Now your row logic works correctly:
+            if (count($parts) >= 2) {
+                $extracted_items[] = [
+                    'text'       => $parts[0],
+                    'quantity'   => (int)($parts[1] ?? 1),
+                    'unit_price' => (float)($parts[2] ?? 0)
+                ];
+            }
+        }
+    } catch (\Throwable $e) {
+        echo json_encode(['error' => 'PDF Extraction Error: ' . $e->getMessage()]);
+        exit;
+    }
+}else {
+        // === IMAGE HANDLING (MOCK OR API) ===
+        if ($USE_MOCK) {
+            sleep(2);
+            $extracted_items = [];
+            $mockProducts = array_slice($products, 0, 4);
+            foreach ($mockProducts as $p) {
+                $extracted_items[] = [
+                    'text'     => $p['description'],
+                    'quantity' => rand(2, 15), 'unit_price' => 0
+                ];
+            }
+            $extracted_items[] = ['text' => 'unknown product xyz', 'quantity' => 2, 'unit_price' => 0];
+
+        } else {
+            // Real Anthropic API for images
+            $fileData = base64_encode(file_get_contents($file['tmp_name']));
+            $mimeType = $file['type'];
+
+            $productList = implode("\n", array_map(function($p) {
+                return "- ID:{$p['id']} | {$p['description']} | Price: Rs {$p['price']}";
+            }, $products));
+
+            $prompt = "You are a smart invoice reader for a paint/spray POS system in Pakistan.\n\nExtract ALL items from this invoice image. For each item return the product name as written and the quantity.\n\nSupplier products for reference:\n$productList\n\nReturn ONLY valid JSON:\n{\"items\": [{\"text\": \"item name\", \"quantity\": 5}]}";
+
+            $requestBody = [
+                'model'      => 'claude-sonnet-4-20250514',
+                'max_tokens' => 1000,
+                'messages'   => [[
+                    'role'    => 'user',
+                    'content' => [
+                        ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mimeType, 'data' => $fileData]],
+                        ['type' => 'text',  'text'   => $prompt]
+                    ]
+                ]]
             ];
+
+            $ch = curl_init('https://api.anthropic.com/v1/messages');
+            // ... (keep your existing curl_setopt curl array settings here) ...
+            $response     = curl_exec($ch);
+            curl_close($ch);
+            $responseData = json_decode($response, true);
+
+            if (!isset($responseData['content'][0]['text'])) {
+                echo json_encode(['error' => 'AI could not read the invoice. Please try again.']); exit;
+            }
+
+            $text   = preg_replace('/```json|```/', '', $responseData['content'][0]['text']);
+            $parsed = json_decode(trim($text), true);
+
+            if (!$parsed || !isset($parsed['items'])) {
+                echo json_encode(['error' => 'Could not parse AI response. Please try again.']); exit;
+            }
+
+            $extracted_items = $parsed['items'];
         }
-        $extracted_items[] = ['text' => 'unknown product xyz', 'quantity' => 2, 'unit_price' => 0];
-
-    } else {
-        // Real Anthropic API for images/PDFs
-        $fileData = base64_encode(file_get_contents($file['tmp_name']));
-        $mimeType = $file['type'];
-
-        $productList = implode("\n", array_map(function($p) {
-            return "- ID:{$p['id']} | {$p['description']} | Price: Rs {$p['price']}";
-        }, $products));
-
-        $prompt = "You are a smart invoice reader for a paint/spray POS system in Pakistan.\n\nExtract ALL items from this invoice image. For each item return the product name as written and the quantity.\n\nSupplier products for reference:\n$productList\n\nReturn ONLY valid JSON:\n{\"items\": [{\"text\": \"item name\", \"quantity\": 5}]}";
-
-        $requestBody = [
-            'model'      => 'claude-sonnet-4-20250514',
-            'max_tokens' => 1000,
-            'messages'   => [[
-                'role'    => 'user',
-                'content' => [
-                    ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mimeType, 'data' => $fileData]],
-                    ['type' => 'text',  'text'   => $prompt]
-                ]
-            ]]
-        ];
-
-        $ch = curl_init('https://api.anthropic.com/v1/messages');
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'x-api-key: ' . $ANTHROPIC_KEY,
-                'anthropic-version: 2023-06-01'
-            ],
-            CURLOPT_POSTFIELDS => json_encode($requestBody)
-        ]);
-
-        $response     = curl_exec($ch);
-        curl_close($ch);
-        $responseData = json_decode($response, true);
-
-        if (!isset($responseData['content'][0]['text'])) {
-            echo json_encode(['error' => 'AI could not read the invoice. Please try again.']); exit;
-        }
-
-        $text   = preg_replace('/```json|```/', '', $responseData['content'][0]['text']);
-        $parsed = json_decode(trim($text), true);
-
-        if (!$parsed || !isset($parsed['items'])) {
-            echo json_encode(['error' => 'Could not parse AI response. Please try again.']); exit;
-        }
-
-        $extracted_items = $parsed['items'];
     }
 }
 
@@ -308,31 +340,51 @@ if (in_array($ext, ['txt', 'csv'])) {
 function matchProduct($text, $products) {
     $text = strtolower(trim($text));
 
-    // Exact match
+    // 1. Perfect Exact Match check
     foreach ($products as $p) {
         if (strtolower($p['description']) === $text) {
             return ['product' => $p, 'type' => 'exact'];
         }
     }
 
-    // Fuzzy: score by matching words
-    $words     = preg_split('/[\s,\-]+/', $text);
+    // 2. Typos & Spelling Mistake Tolerant Fuzzy Matching
+    $words = preg_split('/[\s,\-]+/', $text);
+    $words = array_filter($words, function($w) { return strlen($w) > 2; }); 
+    
     $bestScore = 0;
     $bestMatch = null;
 
     foreach ($products as $p) {
         $pdesc = strtolower($p['description']);
-        $score = 0;
-        foreach ($words as $word) {
-            if (strlen($word) > 1 && strpos($pdesc, $word) !== false) $score++;
+        $pWords = preg_split('/[\s,\-]+/', $pdesc);
+        
+        $matchedWordsCount = 0;
+        
+        foreach ($words as $scannedWord) {
+            foreach ($pWords as $dbWord) {
+                // Calculate similarity percentage between the two words
+                similar_text($scannedWord, $dbWord, $percent);
+                
+                // If the word matches by more than 75% (e.g., "whiteee" vs "white" is ~83%)
+                if ($percent >= 75 || strpos($dbWord, $scannedWord) !== false || strpos($scannedWord, $dbWord) !== false) {
+                    $matchedWordsCount++;
+                    break; // Word found, move to next scanned word
+                }
+            }
         }
-        if ($score > $bestScore) {
-            $bestScore = $score;
+        
+        if ($matchedWordsCount > $bestScore) {
+            $bestScore = $matchedWordsCount;
             $bestMatch = $p;
         }
     }
 
-    if ($bestScore >= 1 && $bestMatch) {
+    $totalWordsCount = count($words);
+    
+    // REQUIREMENT: Every descriptive word must match or be a typo of an existing word.
+    // "paint master dabbi whiteee" -> matches 4/4 words (Whiteee matches White). Passes!
+    // "paint master dabbi brown"   -> matches 3/4 words (Brown matches nothing). Blocked!
+    if ($totalWordsCount > 0 && $bestScore >= $totalWordsCount && $bestMatch) {
         return ['product' => $bestMatch, 'type' => 'fuzzy'];
     }
 
@@ -340,6 +392,8 @@ function matchProduct($text, $products) {
 }
 
 // STEP 4: Build final result
+
+
 $finalItems = [];
 foreach ($extracted_items as $item) {
     $match = matchProduct($item['text'], $products);

@@ -479,7 +479,7 @@ if (isset($_GET['id'])) {
     function downloadPDF() {
         const element = document.getElementById('invoiceContent');
         const opt = {
-            margin: 0.5,
+            margin: 0.2,
             filename: 'Invoice-' + invoiceNumber + '.pdf',
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2 },
