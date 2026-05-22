@@ -1,0 +1,3 @@
+- [ ] Modify admin/categories.php to add password prompt for category deletion
+  - [ ] Change delete link to use onclick with JavaScript function
+  - [ ] Add JavaScript function to prompt for password "123" and proceed if correct
